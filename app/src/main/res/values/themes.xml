@@ -4,4 +4,10 @@
         <item name="colorPrimary">@color/purple</item>
         <item name="colorOnPrimary">@android:color/white</item>
     </style>
+
+    <!-- Kılavuz ekranı: geri oklu üst çubuk için. -->
+    <style name="Theme.VoiceCont.WithBar" parent="Theme.Material3.DayNight">
+        <item name="colorPrimary">@color/purple</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+    </style>
 </resources>

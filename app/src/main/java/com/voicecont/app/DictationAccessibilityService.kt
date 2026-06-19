@@ -23,6 +23,12 @@ class DictationAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
 
+    /** Boş kutuda ipucu/placeholder olarak görülen yaygın metinler (gerçek taslak değil). */
+    private val hintBlacklist = listOf(
+        "message", "mesaj", "type a message", "mesaj yazın", "mesaj yaz",
+        "send a message", "write a message", "message…", "mesaj…"
+    )
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
@@ -38,56 +44,45 @@ class DictationAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    /** Otomatik mod: metni yaz, kısa gecikme sonrası gönder. */
-    fun dictateAndSend(text: String) {
-        if (writeText(text)) {
-            // Metnin işlenmesi + Gönder butonunun etkinleşmesi için kısa bekleme.
-            handler.postDelayed({ performSend() }, 350)
-        }
-    }
-
-    /** Manuel mod: sadece metni kutuya yaz, gönderme. */
-    fun dictateOnly(text: String) {
-        writeText(text)
-    }
-
-    /** Manuel mod: "gönder/send" komutu gelince yalnızca Gönder'e bas. */
-    fun sendOnly() {
-        performSend()
+    /**
+     * Kutudaki GERÇEK mevcut metni döndürür (ipucu/placeholder ise boş sayar).
+     * Sürekli dikte tamponunu başlatmak için kullanılır.
+     */
+    fun currentFieldText(): String {
+        val field = findEditableNode(rootInActiveWindow) ?: return ""
+        val hint = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            field.hintText?.toString() else null
+        val raw = field.text?.toString().orEmpty()
+        val low = raw.trim().lowercase()
+        return if (raw.isBlank() || raw == hint || hintBlacklist.contains(low)) "" else raw
     }
 
     /**
-     * Metni aktif penceredeki yazı kutusuna yazar (varsa taslağın sonuna ekler).
+     * Kutuya TAM metni yazar (mevcut içeriği değiştirir — ipucu metni karışmaz).
+     * Tampon mantığı çağıran tarafta (OverlayService) tutulur.
      * @return kutu bulunup yazıldıysa true.
      */
-    private fun writeText(text: String): Boolean {
+    fun writeText(fullText: String): Boolean {
         val field = findEditableNode(rootInActiveWindow)
         if (field == null) {
             toast(getString(R.string.no_field))
             return false
         }
-
-        // Boş kutuda bazı uygulamalar (WhatsApp gibi) ipucu metnini ("Message")
-        // text olarak döndürür → onu mevcut metin sanma.
-        val hint = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            field.hintText?.toString() else null
-        val raw = field.text?.toString().orEmpty()
-        val existing = if (raw.isBlank() || raw == hint) "" else raw
-
-        val combined = if (existing.isBlank()) text
-        else if (existing.endsWith(" ")) existing + text
-        else "$existing $text"
-
         val args = Bundle().apply {
             putCharSequence(
                 AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                combined
+                fullText
             )
         }
         return field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
     }
 
-    private fun performSend() {
+    /** Kısa gecikmeyle gönder (metnin işlenmesi için). */
+    fun sendDelayed() {
+        handler.postDelayed({ performSend() }, 350)
+    }
+
+    fun performSend() {
         val root = rootInActiveWindow ?: return
         val sendButton = SendButtonFinder.find(root)
 

@@ -6,12 +6,6 @@ import android.content.Context
 object Prefs {
     private const val FILE = "voice_cont_prefs"
     private const val KEY_AUTO_SEND = "auto_send"
-    private const val KEY_LANG = "dictation_lang"
-
-    // Dikte dili seçenekleri. Boş ("") = cihazın varsayılan dili.
-    const val LANG_TR = "tr-TR"
-    const val LANG_EN = "en-US"
-    const val LANG_DEVICE = ""
 
     private fun prefs(ctx: Context) =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -21,10 +15,4 @@ object Prefs {
 
     fun setAutoSend(ctx: Context, value: Boolean) =
         prefs(ctx).edit().putBoolean(KEY_AUTO_SEND, value).apply()
-
-    fun lang(ctx: Context): String =
-        prefs(ctx).getString(KEY_LANG, LANG_TR) ?: LANG_TR
-
-    fun setLang(ctx: Context, value: String) =
-        prefs(ctx).edit().putString(KEY_LANG, value).apply()
 }

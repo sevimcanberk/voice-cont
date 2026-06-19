@@ -9,7 +9,9 @@ import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -35,7 +37,19 @@ class OverlayService : Service() {
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
 
+    // ---- Oturum durumu (sürekli dinleme) ----
+    private var sessionActive = false        // manuel modda dinleme döngüsü açık mı
+    private var autoSendMode = true          // bu oturum otomatik gönder mi
+    private var seed = ""                    // oturum başındaki gerçek taslak
+    private val rawTranscript = StringBuilder()  // söylenen ham kelimeler
+    private var silenceCount = 0             // peş peşe sessizlik sayısı
+    private val maxSilence = 2               // bu kadar sessizlikten sonra dur
+
+    private val handler = Handler(Looper.getMainLooper())
     private val channelId = "voice_cont_overlay"
+
+    /** Oturum açıksa bir sonraki döngüde tekrar dinlemeye başla. */
+    private fun relisten() = handler.post { if (sessionActive) startListening() }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -139,33 +153,51 @@ class OverlayService : Service() {
     }
 
     private fun onBubbleTap() {
-        if (listening) {
-            stopListening()
+        // Oturum açıksa (dinliyorsa) → iptal et / durdur.
+        if (sessionActive || listening) {
+            endSession()
             return
         }
         if (DictationAccessibilityService.instance == null) {
             toast(getString(R.string.no_accessibility))
             return
         }
-        startListening()
+        startSession()
     }
 
-    // ---- Ses tanıma ----
+    // ---- Oturum yönetimi ----
 
-    private fun startListening() {
+    private fun startSession() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             toast("Cihazda ses tanıma yok.")
             return
         }
+        autoSendMode = Prefs.isAutoSend(this)
+        seed = DictationAccessibilityService.instance?.currentFieldText().orEmpty()
+        rawTranscript.setLength(0)
+        silenceCount = 0
+        sessionActive = true
+        toast(getString(R.string.listening))
+        startListening()
+    }
+
+    private fun endSession() {
+        sessionActive = false
+        stopListening()
+    }
+
+    private fun startListening() {
+        // Önceki tanıyıcıyı temizle (sürekli modda BUSY çakışmasını önler).
+        recognizer?.destroy()
+        recognizer = null
+
         listening = true
         bubble.setBackgroundResource(R.drawable.bubble_bg_listening)
-        toast(getString(R.string.listening))
-
         recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
             setRecognitionListener(recognitionListener)
         }
-        // Dikte dili: ayardan; boşsa cihazın varsayılan dili.
-        val lang = Prefs.lang(this).ifBlank { Locale.getDefault().toLanguageTag() }
+        // Dil: cihazın varsayılan dili (otomatik). Komutlar zaten iki dilli algılanır.
+        val lang = Locale.getDefault().toLanguageTag()
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -183,40 +215,73 @@ class OverlayService : Service() {
         listening = false
         bubble.setBackgroundResource(R.drawable.bubble_bg)
         recognizer?.apply {
-            stopListening()
+            runCatching { stopListening() }
             destroy()
         }
         recognizer = null
     }
 
+    /** Geçerli tampondan kutuya yazılacak tam metni üretir ve yazar. */
+    private fun renderAndWrite(): Boolean {
+        val parsed = VoiceCommands.parse(rawTranscript.toString())
+        val body = VoiceCommands.render(parsed.tokens)
+        val full = when {
+            seed.isBlank() -> body
+            body.isBlank() -> seed
+            seed.endsWith(" ") || seed.endsWith("\n") -> seed + body
+            else -> "$seed $body"
+        }
+        return DictationAccessibilityService.instance?.writeText(full) ?: false
+    }
+
     private val recognitionListener = object : RecognitionListener {
         override fun onResults(results: Bundle?) {
-            val text = results
+            val chunk = results
                 ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 ?.firstOrNull()
-            stopListening()
-            if (text.isNullOrBlank()) return
+            listening = false
 
             val svc = DictationAccessibilityService.instance
             if (svc == null) {
+                endSession()
                 toast(getString(R.string.no_accessibility))
                 return
             }
 
-            if (Prefs.isAutoSend(this@OverlayService)) {
-                // Otomatik mod: yaz ve gönder.
-                svc.dictateAndSend(text)
-            } else {
-                // Manuel mod: "gönder/send" komutu ise gönder, değilse kutuya yaz.
-                if (isSendCommand(text)) svc.sendOnly() else svc.dictateOnly(text)
+            if (chunk.isNullOrBlank()) {
+                onSilence()
+                return
+            }
+            silenceCount = 0
+
+            // Sondaki "gönder/send" komutunu ayır; kalan ham sözü tampona ekle.
+            val (raw, isSend) = VoiceCommands.stripTrailingSend(chunk)
+            if (raw.isNotBlank()) {
+                if (rawTranscript.isNotEmpty()) rawTranscript.append(' ')
+                rawTranscript.append(raw)
+            }
+
+            // Tamponu (noktalama dönüştürülmüş haliyle) kutuya yaz.
+            renderAndWrite()
+
+            if (autoSendMode || isSend) {
+                // Otomatik mod: hep gönder. Manuel mod: komut geldiyse gönder.
+                svc.sendDelayed()
+                endSession()
+            } else if (sessionActive) {
+                // Manuel mod, komut yok → dinlemeye devam et (biraz daha).
+                relisten()
             }
         }
 
         override fun onError(error: Int) {
-            stopListening()
-            if (error != SpeechRecognizer.ERROR_NO_MATCH &&
-                error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+            listening = false
+            if (error == SpeechRecognizer.ERROR_NO_MATCH ||
+                error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
             ) {
+                onSilence()
+            } else {
+                endSession()
                 toast("Ses tanıma hatası ($error)")
             }
         }
@@ -230,6 +295,20 @@ class OverlayService : Service() {
         override fun onEvent(eventType: Int, params: Bundle?) {}
     }
 
+    /** Sessizlik/eşleşmeme: manuel modda sınıra kadar dinlemeye devam et. */
+    private fun onSilence() {
+        if (autoSendMode || !sessionActive) {
+            endSession()
+            return
+        }
+        silenceCount++
+        if (silenceCount >= maxSilence) {
+            endSession()  // metin kutuda kalır, gönderilmez
+        } else {
+            relisten()
+        }
+    }
+
     // ---- Yardımcılar ----
 
     override fun onDestroy() {
@@ -239,12 +318,6 @@ class OverlayService : Service() {
             runCatching { windowManager.removeView(bubble) }
         }
     }
-
-    // Yalnızca "gönder" / "send" (tek başına, sonda nokta/ünlem olabilir) → gönder komutu.
-    private val sendCommand = Regex("^(gönder|gonder|send)[.!?\\s]*$", RegexOption.IGNORE_CASE)
-
-    private fun isSendCommand(text: String): Boolean =
-        sendCommand.matches(text.trim())
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 

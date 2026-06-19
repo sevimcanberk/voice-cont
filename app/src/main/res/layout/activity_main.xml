@@ -62,11 +62,11 @@
             android:text="@string/auto_send" />
 
         <Button
-            android:id="@+id/btnLang"
+            android:id="@+id/btnGuide"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="28dp"
-            android:text="@string/lang_label" />
+            android:text="@string/guide_button" />
 
         <Button
             android:id="@+id/btnStart"

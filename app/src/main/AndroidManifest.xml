@@ -23,6 +23,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".HelpActivity"
+            android:exported="false"
+            android:label="Kılavuz"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.VoiceCont.WithBar" />
+
         <service
             android:name=".OverlayService"
             android:exported="false"

@@ -20,7 +20,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnOverlay: Button
     private lateinit var btnAccessibility: Button
     private lateinit var btnAutoSend: Button
-    private lateinit var btnLang: Button
+    private lateinit var btnGuide: Button
     private lateinit var btnStart: Button
     private lateinit var tvStatus: TextView
 
@@ -32,7 +32,7 @@ class MainActivity : AppCompatActivity() {
         btnOverlay = findViewById(R.id.btnOverlay)
         btnAccessibility = findViewById(R.id.btnAccessibility)
         btnAutoSend = findViewById(R.id.btnAutoSend)
-        btnLang = findViewById(R.id.btnLang)
+        btnGuide = findViewById(R.id.btnGuide)
         btnStart = findViewById(R.id.btnStart)
         tvStatus = findViewById(R.id.tvStatus)
 
@@ -60,15 +60,8 @@ class MainActivity : AppCompatActivity() {
             updateSettingLabels()
         }
 
-        btnLang.setOnClickListener {
-            // Türkçe → English → Cihaz dili → ...
-            val next = when (Prefs.lang(this)) {
-                Prefs.LANG_TR -> Prefs.LANG_EN
-                Prefs.LANG_EN -> Prefs.LANG_DEVICE
-                else -> Prefs.LANG_TR
-            }
-            Prefs.setLang(this, next)
-            updateSettingLabels()
+        btnGuide.setOnClickListener {
+            startActivity(Intent(this, HelpActivity::class.java))
         }
 
         btnStart.setOnClickListener { toggleOverlay() }
@@ -79,14 +72,7 @@ class MainActivity : AppCompatActivity() {
         btnAutoSend.text = if (Prefs.isAutoSend(this))
             "Otomatik gönder: AÇIK (konuş → yaz + gönder)"
         else
-            "Otomatik gönder: KAPALI (yaz, sonra \"gönder/send\" de)"
-
-        val langName = when (Prefs.lang(this)) {
-            Prefs.LANG_TR -> "Türkçe"
-            Prefs.LANG_EN -> "English"
-            else -> "Cihaz dili"
-        }
-        btnLang.text = "Dikte dili: $langName"
+            "Otomatik gönder: KAPALI (konuş → \"gönder/send\" deyince gider)"
     }
 
     override fun onResume() {
