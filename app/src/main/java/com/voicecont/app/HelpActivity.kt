@@ -53,9 +53,10 @@ Butona tekrar dokunmak = dinlemeyi iptal et (yazılan kutuda kalır).
   dinlemeye devam eder; eklemek istediğini söyleyebilirsin. Bitince
   "gönder" / "send" dediğinde mesaj gider. Tekrar butona dokunmana gerek yok.
 
-▌ DİL
-Dikte dili cihazının diline göre otomatik ayarlanır. İngilizce dikte için
-telefonda İngilizce sesle-yazma paketini kur:
+▌ DİL DEĞİŞTİRME (TR / EN)
+Yüzen butona UZUN BAS → altında TR ve EN baloncukları çıkar. Birine dokun,
+o dil seçilir ve baloncuklar kapanır (tek buton kalır). Seçili dil parlak görünür.
+İngilizce dikte için telefonda İngilizce sesle-yazma paketini kur:
 Ayarlar → Genel yönetim → Klavye → Google ile sesle yazma → İngilizce indir.
 
 ──────────────────────────────

@@ -6,7 +6,9 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -18,10 +20,11 @@ import android.speech.SpeechRecognizer
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
-import java.util.Locale
 import kotlin.math.abs
 
 /**
@@ -33,6 +36,16 @@ class OverlayService : Service() {
     private lateinit var windowManager: WindowManager
     private lateinit var bubble: ImageView
     private lateinit var params: WindowManager.LayoutParams
+
+    // Dil seçici baloncukları (uzun basınca açılır)
+    private var trBubble: TextView? = null
+    private var enBubble: TextView? = null
+    private var pickerVisible = false
+    private var longPressed = false
+    private val longPressRunnable = Runnable {
+        longPressed = true
+        showLanguagePicker()
+    }
 
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
@@ -132,19 +145,29 @@ class OverlayService : Service() {
                     touchX = event.rawX
                     touchY = event.rawY
                     moved = false
+                    longPressed = false
+                    handler.postDelayed(
+                        longPressRunnable,
+                        ViewConfiguration.getLongPressTimeout().toLong()
+                    )
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - touchX).toInt()
                     val dy = (event.rawY - touchY).toInt()
-                    if (abs(dx) > dp(8) || abs(dy) > dp(8)) moved = true
+                    if (abs(dx) > dp(8) || abs(dy) > dp(8)) {
+                        moved = true
+                        handler.removeCallbacks(longPressRunnable)
+                        if (pickerVisible) hideLanguagePicker()
+                    }
                     params.x = initialX + dx
                     params.y = initialY + dy
                     windowManager.updateViewLayout(bubble, params)
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!moved) onBubbleTap()
+                    handler.removeCallbacks(longPressRunnable)
+                    if (!moved && !longPressed) onBubbleTap()
                     true
                 }
                 else -> false
@@ -152,7 +175,69 @@ class OverlayService : Service() {
         }
     }
 
+    // ---- Dil seçici (uzun basma) ----
+
+    private fun showLanguagePicker() {
+        if (pickerVisible) return
+        val size = dp(52)
+        val gap = dp(10)
+        val screenH = resources.displayMetrics.heightPixels
+
+        // Ana butonun altına iki baloncuk; alta sığmazsa üste koy.
+        val below = params.y + 2 * (size + gap) + size < screenH
+        val y1 = if (below) params.y + (size + gap) else params.y - (size + gap)
+        val y2 = if (below) params.y + 2 * (size + gap) else params.y - 2 * (size + gap)
+
+        trBubble = makePickerBubble("TR", Prefs.LANG_TR)
+        enBubble = makePickerBubble("EN", Prefs.LANG_EN)
+        windowManager.addView(trBubble, pickerParams(params.x, y1, size))
+        windowManager.addView(enBubble, pickerParams(params.x, y2, size))
+        pickerVisible = true
+    }
+
+    private fun hideLanguagePicker() {
+        trBubble?.let { runCatching { windowManager.removeView(it) } }
+        enBubble?.let { runCatching { windowManager.removeView(it) } }
+        trBubble = null
+        enBubble = null
+        pickerVisible = false
+    }
+
+    private fun makePickerBubble(label: String, lang: String): TextView =
+        TextView(this).apply {
+            text = label
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setBackgroundResource(R.drawable.bubble_bg)
+            // Seçili dili vurgula
+            alpha = if (Prefs.lang(this@OverlayService) == lang) 1f else 0.6f
+            setOnClickListener {
+                Prefs.setLang(this@OverlayService, lang)
+                toast("Dil: " + if (lang == Prefs.LANG_TR) "Türkçe" else "English")
+                hideLanguagePicker()
+            }
+        }
+
+    private fun pickerParams(x: Int, y: Int, size: Int): WindowManager.LayoutParams =
+        WindowManager.LayoutParams(
+            size, size,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            this.x = x
+            this.y = y
+        }
+
     private fun onBubbleTap() {
+        // Dil seçici açıksa → kapat.
+        if (pickerVisible) {
+            hideLanguagePicker()
+            return
+        }
         // Oturum açıksa (dinliyorsa) → iptal et / durdur.
         if (sessionActive || listening) {
             endSession()
@@ -196,8 +281,8 @@ class OverlayService : Service() {
         recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
             setRecognitionListener(recognitionListener)
         }
-        // Dil: cihazın varsayılan dili (otomatik). Komutlar zaten iki dilli algılanır.
-        val lang = Locale.getDefault().toLanguageTag()
+        // Dil: yüzen butona uzun basıp seçilen (TR/EN). Komutlar yine iki dilli algılanır.
+        val lang = Prefs.lang(this)
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -313,7 +398,9 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        handler.removeCallbacks(longPressRunnable)
         recognizer?.destroy()
+        hideLanguagePicker()
         if (this::bubble.isInitialized) {
             runCatching { windowManager.removeView(bubble) }
         }
