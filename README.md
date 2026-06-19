@@ -59,8 +59,19 @@ Bittiğinde çalışmanın altındaki **Artifacts → `voice-cont-debug-apk`**'y
 
 Üçü de verilince ana ekrandaki **"Yüzen butonu başlat"**'a bas. Bitti.
 
-> Türkçe sesli yazma çevrimdışı çalışsın istersen: Android Ayarlar → Sistem → Diller →
-> Sesle yazma → Türkçe dil paketini indir.
+> Sesli yazma çevrimdışı/doğru çalışsın istersen: Android Ayarlar → Sistem → Diller →
+> Sesle yazma → kullandığın dil paketini (Türkçe ve/veya İngilizce) indir.
+
+---
+
+## Ayarlar (ana ekran)
+
+- **Otomatik gönder: AÇIK** → butona dokun, konuş; mesaj yazılır ve hemen gönderilir.
+- **Otomatik gönder: KAPALI** → butona dokun, konuş; mesaj sadece kutuya **yazılır**.
+  Göndermek için butona tekrar dokunup **"gönder"** (TR) veya **"send"** (EN) de.
+  (Komut iki dilde de algılanır; tek başına söylenmeli.)
+- **Dikte dili** → Türkçe / English / Cihaz dili arasında geçiş. İngilizce dikte için
+  yukarıdaki İngilizce dil paketini indir.
 
 ---
 
@@ -78,5 +89,6 @@ app/src/main/java/com/voicecont/app/
   OverlayService.kt                  # Yüzen buton + ses dinleme akışı
   DictationAccessibilityService.kt   # Metni yaz + Gönder'e bas
   SendButtonFinder.kt                # Gönder butonu tespiti (çok dilli)
+  Prefs.kt                           # Ayarlar (otomatik gönder, dikte dili)
 .github/workflows/build.yml          # Bulut APK derleme
 ```

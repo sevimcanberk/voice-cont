@@ -19,6 +19,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.Toast
+import java.util.Locale
 import kotlin.math.abs
 
 /**
@@ -163,12 +164,15 @@ class OverlayService : Service() {
         recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
             setRecognitionListener(recognitionListener)
         }
+        // Dikte dili: ayardan; boşsa cihazın varsayılan dili.
+        val lang = Prefs.lang(this).ifBlank { Locale.getDefault().toLanguageTag() }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             )
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
@@ -191,8 +195,20 @@ class OverlayService : Service() {
                 ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 ?.firstOrNull()
             stopListening()
-            if (!text.isNullOrBlank()) {
-                DictationAccessibilityService.instance?.dictateAndSend(text)
+            if (text.isNullOrBlank()) return
+
+            val svc = DictationAccessibilityService.instance
+            if (svc == null) {
+                toast(getString(R.string.no_accessibility))
+                return
+            }
+
+            if (Prefs.isAutoSend(this@OverlayService)) {
+                // Otomatik mod: yaz ve gönder.
+                svc.dictateAndSend(text)
+            } else {
+                // Manuel mod: "gönder/send" komutu ise gönder, değilse kutuya yaz.
+                if (isSendCommand(text)) svc.sendOnly() else svc.dictateOnly(text)
             }
         }
 
@@ -223,6 +239,12 @@ class OverlayService : Service() {
             runCatching { windowManager.removeView(bubble) }
         }
     }
+
+    // Yalnızca "gönder" / "send" (tek başına, sonda nokta/ünlem olabilir) → gönder komutu.
+    private val sendCommand = Regex("^(gönder|gonder|send)[.!?\\s]*$", RegexOption.IGNORE_CASE)
+
+    private fun isSendCommand(text: String): Boolean =
+        sendCommand.matches(text.trim())
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 

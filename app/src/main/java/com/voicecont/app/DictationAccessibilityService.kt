@@ -38,18 +38,42 @@ class DictationAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    /**
-     * Metni aktif penceredeki yazı kutusuna yazar, kısa bir gecikme sonrası gönderir.
-     */
+    /** Otomatik mod: metni yaz, kısa gecikme sonrası gönder. */
     fun dictateAndSend(text: String) {
+        if (writeText(text)) {
+            // Metnin işlenmesi + Gönder butonunun etkinleşmesi için kısa bekleme.
+            handler.postDelayed({ performSend() }, 350)
+        }
+    }
+
+    /** Manuel mod: sadece metni kutuya yaz, gönderme. */
+    fun dictateOnly(text: String) {
+        writeText(text)
+    }
+
+    /** Manuel mod: "gönder/send" komutu gelince yalnızca Gönder'e bas. */
+    fun sendOnly() {
+        performSend()
+    }
+
+    /**
+     * Metni aktif penceredeki yazı kutusuna yazar (varsa taslağın sonuna ekler).
+     * @return kutu bulunup yazıldıysa true.
+     */
+    private fun writeText(text: String): Boolean {
         val field = findEditableNode(rootInActiveWindow)
         if (field == null) {
             toast(getString(R.string.no_field))
-            return
+            return false
         }
 
-        // Var olan metnin sonuna ekle (kutuda taslak olabilir).
-        val existing = field.text?.toString().orEmpty()
+        // Boş kutuda bazı uygulamalar (WhatsApp gibi) ipucu metnini ("Message")
+        // text olarak döndürür → onu mevcut metin sanma.
+        val hint = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            field.hintText?.toString() else null
+        val raw = field.text?.toString().orEmpty()
+        val existing = if (raw.isBlank() || raw == hint) "" else raw
+
         val combined = if (existing.isBlank()) text
         else if (existing.endsWith(" ")) existing + text
         else "$existing $text"
@@ -60,10 +84,7 @@ class DictationAccessibilityService : AccessibilityService() {
                 combined
             )
         }
-        field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-
-        // Metnin işlenmesi + Gönder butonunun etkinleşmesi için kısa bekleme.
-        handler.postDelayed({ performSend() }, 350)
+        return field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
     }
 
     private fun performSend() {

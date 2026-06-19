@@ -19,6 +19,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnMic: Button
     private lateinit var btnOverlay: Button
     private lateinit var btnAccessibility: Button
+    private lateinit var btnAutoSend: Button
+    private lateinit var btnLang: Button
     private lateinit var btnStart: Button
     private lateinit var tvStatus: TextView
 
@@ -29,6 +31,8 @@ class MainActivity : AppCompatActivity() {
         btnMic = findViewById(R.id.btnMic)
         btnOverlay = findViewById(R.id.btnOverlay)
         btnAccessibility = findViewById(R.id.btnAccessibility)
+        btnAutoSend = findViewById(R.id.btnAutoSend)
+        btnLang = findViewById(R.id.btnLang)
         btnStart = findViewById(R.id.btnStart)
         tvStatus = findViewById(R.id.tvStatus)
 
@@ -51,7 +55,38 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
 
+        btnAutoSend.setOnClickListener {
+            Prefs.setAutoSend(this, !Prefs.isAutoSend(this))
+            updateSettingLabels()
+        }
+
+        btnLang.setOnClickListener {
+            // Türkçe → English → Cihaz dili → ...
+            val next = when (Prefs.lang(this)) {
+                Prefs.LANG_TR -> Prefs.LANG_EN
+                Prefs.LANG_EN -> Prefs.LANG_DEVICE
+                else -> Prefs.LANG_TR
+            }
+            Prefs.setLang(this, next)
+            updateSettingLabels()
+        }
+
         btnStart.setOnClickListener { toggleOverlay() }
+        updateSettingLabels()
+    }
+
+    private fun updateSettingLabels() {
+        btnAutoSend.text = if (Prefs.isAutoSend(this))
+            "Otomatik gönder: AÇIK (konuş → yaz + gönder)"
+        else
+            "Otomatik gönder: KAPALI (yaz, sonra \"gönder/send\" de)"
+
+        val langName = when (Prefs.lang(this)) {
+            Prefs.LANG_TR -> "Türkçe"
+            Prefs.LANG_EN -> "English"
+            else -> "Cihaz dili"
+        }
+        btnLang.text = "Dikte dili: $langName"
     }
 
     override fun onResume() {

@@ -16,6 +16,10 @@
     <string name="status_granted">✓ verildi</string>
     <string name="status_missing">✗ eksik</string>
 
+    <string name="settings_header">AYARLAR</string>
+    <string name="auto_send">Otomatik gönder</string>
+    <string name="lang_label">Dikte dili</string>
+
     <string name="listening">Dinliyorum…</string>
     <string name="no_accessibility">Erişilebilirlik servisi kapalı — ana ekrandan aç.</string>
     <string name="no_field">Yazılacak metin kutusu bulunamadı.</string>
