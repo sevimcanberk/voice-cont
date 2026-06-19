@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Voice Cont.</string>
+    <string name="accessibility_label">Voice Cont. — sohbete yaz ve gönder</string>
+    <string name="accessibility_description">Açık olan sohbet uygulamasının metin kutusuna dikte edilen mesajı yazar ve Gönder butonuna basar.</string>
+
+    <string name="title">Voice Cont.</string>
+    <string name="subtitle">Sesle dikte et, açık sohbete otomatik gönder.</string>
+
+    <string name="perm_mic">1. Mikrofon izni</string>
+    <string name="perm_overlay">2. Üstte gösterme izni</string>
+    <string name="perm_accessibility">3. Erişilebilirlik servisi</string>
+    <string name="start_overlay">Yüzen butonu başlat</string>
+    <string name="stop_overlay">Yüzen butonu durdur</string>
+
+    <string name="status_granted">✓ verildi</string>
+    <string name="status_missing">✗ eksik</string>
+
+    <string name="listening">Dinliyorum…</string>
+    <string name="no_accessibility">Erişilebilirlik servisi kapalı — ana ekrandan aç.</string>
+    <string name="no_field">Yazılacak metin kutusu bulunamadı.</string>
+    <string name="not_sent">Mesaj yazıldı ama Gönder butonu bulunamadı — elle gönder.</string>
+    <string name="notif_channel">Voice Cont. servisi</string>
+    <string name="notif_text">Yüzen mikrofon butonu aktif.</string>
+</resources>
