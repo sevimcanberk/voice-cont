@@ -49,9 +49,10 @@ Butona tekrar dokunmak = dinlemeyi iptal et (yazılan kutuda kalır).
   Konuş → mesaj yazılır ve hemen gönderilir. (Tek seferlik, hızlı.)
 
 • Otomatik gönder: KAPALI
-  Konuş → mesaj kutuya yazılır, GÖNDERİLMEZ. Uygulama seni biraz daha
-  dinlemeye devam eder; eklemek istediğini söyleyebilirsin. Bitince
-  "gönder" / "send" dediğinde mesaj gider. Tekrar butona dokunmana gerek yok.
+  Konuş → mesaj kutuya yazılır, GÖNDERİLMEZ. Uygulama son sözden sonra seni
+  ~25 saniye daha dinlemeye devam eder; eklemek istediğini söyleyebilirsin.
+  Bitince "gönder" / "send" dediğinde mesaj gider. Tekrar butona dokunmana
+  gerek yok. (Komut vermek istiyorsan bu modu KAPALI yapmalısın.)
 
 ▌ DİL DEĞİŞTİRME (TR / EN)
 Yüzen butona UZUN BAS → altında TR ve EN baloncukları çıkar. Birine dokun,

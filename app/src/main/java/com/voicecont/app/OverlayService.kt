@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -55,8 +56,8 @@ class OverlayService : Service() {
     private var autoSendMode = true          // bu oturum otomatik gönder mi
     private var seed = ""                    // oturum başındaki gerçek taslak
     private val rawTranscript = StringBuilder()  // söylenen ham kelimeler
-    private var silenceCount = 0             // peş peşe sessizlik sayısı
-    private val maxSilence = 2               // bu kadar sessizlikten sonra dur
+    private var lastSpeechAt = 0L            // son konuşmanın zamanı (elapsedRealtime)
+    private val relistenWindowMs = 25_000L   // son sözden sonra en az bu kadar dinle
 
     private val handler = Handler(Looper.getMainLooper())
     private val channelId = "voice_cont_overlay"
@@ -260,7 +261,7 @@ class OverlayService : Service() {
         autoSendMode = Prefs.isAutoSend(this)
         seed = DictationAccessibilityService.instance?.currentFieldText().orEmpty()
         rawTranscript.setLength(0)
-        silenceCount = 0
+        lastSpeechAt = SystemClock.elapsedRealtime()
         sessionActive = true
         toast(getString(R.string.listening))
         startListening()
@@ -292,6 +293,10 @@ class OverlayService : Service() {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            // Konuşma duraklamalarında tanıyıcı erken kapanmasın (ipucu; cihaza göre değişir).
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 6000L)
         }
         recognizer?.startListening(intent)
     }
@@ -337,7 +342,7 @@ class OverlayService : Service() {
                 onSilence()
                 return
             }
-            silenceCount = 0
+            lastSpeechAt = SystemClock.elapsedRealtime()
 
             // Sondaki "gönder/send" komutunu ayır; kalan ham sözü tampona ekle.
             val (raw, isSend) = VoiceCommands.stripTrailingSend(chunk)
@@ -380,17 +385,20 @@ class OverlayService : Service() {
         override fun onEvent(eventType: Int, params: Bundle?) {}
     }
 
-    /** Sessizlik/eşleşmeme: manuel modda sınıra kadar dinlemeye devam et. */
+    /**
+     * Sessizlik/eşleşmeme: manuel modda son sözden bu yana 25 sn geçmediyse
+     * dinlemeye devam et (komut için fırsat ver). Süre dolunca dur (metin kutuda kalır).
+     */
     private fun onSilence() {
         if (autoSendMode || !sessionActive) {
             endSession()
             return
         }
-        silenceCount++
-        if (silenceCount >= maxSilence) {
-            endSession()  // metin kutuda kalır, gönderilmez
-        } else {
+        val elapsed = SystemClock.elapsedRealtime() - lastSpeechAt
+        if (elapsed <= relistenWindowMs) {
             relisten()
+        } else {
+            endSession()  // 25 sn boyunca komut gelmedi; metin kutuda kalır
         }
     }
 
