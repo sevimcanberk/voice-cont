@@ -1,5 +1,8 @@
 package com.voicecont.app
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -61,6 +64,24 @@ class OverlayService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private val channelId = "voice_cont_overlay"
+    private var pulseSet: AnimatorSet? = null
+
+    private fun startPulse() {
+        stopPulse()
+        // Pencere sınırında kırpılmaması için ölçek yerine alfa nabzı.
+        val a = ObjectAnimator.ofFloat(bubble, "alpha", 1f, 0.5f).apply {
+            duration = 650
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+        }
+        pulseSet = AnimatorSet().apply { play(a); start() }
+    }
+
+    private fun stopPulse() {
+        pulseSet?.cancel()
+        pulseSet = null
+        if (this::bubble.isInitialized) bubble.alpha = 1f
+    }
 
     /** Oturum açıksa bir sonraki döngüde tekrar dinlemeye başla. */
     private fun relisten() = handler.post { if (sessionActive) startListening() }
@@ -264,11 +285,13 @@ class OverlayService : Service() {
         lastSpeechAt = SystemClock.elapsedRealtime()
         sessionActive = true
         toast(getString(R.string.listening))
+        startPulse()
         startListening()
     }
 
     private fun endSession() {
         sessionActive = false
+        stopPulse()
         stopListening()
     }
 
@@ -407,6 +430,7 @@ class OverlayService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(longPressRunnable)
+        stopPulse()
         recognizer?.destroy()
         hideLanguagePicker()
         if (this::bubble.isInitialized) {
