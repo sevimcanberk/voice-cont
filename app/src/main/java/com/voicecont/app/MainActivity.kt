@@ -113,11 +113,17 @@ class MainActivity : AppCompatActivity() {
         btnAccessibility.text = "3. Erişilebilirlik servisi — " + mark(acc)
 
         btnStart.isEnabled = mic && overlay && acc
-        tvStatus.text = if (mic && overlay && acc)
+        val durum = if (mic && overlay && acc)
             "Hazır. 'Yüzen butonu başlat'a bas."
         else
             "Eksik izinleri tamamla (sırayla 1-2-3)."
+        tvStatus.text = "Sürüm: v${appVersion()}\n$durum"
     }
+
+    private fun appVersion(): String =
+        runCatching {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
+        }.getOrDefault("?")
 
     private fun allGranted(): Boolean =
         hasMic() && Settings.canDrawOverlays(this) && isAccessibilityEnabled()
